@@ -10,6 +10,7 @@ from datetime import datetime
 import streamlit as st
 
 from ai_extractor import extraer_actividades_ia
+from ai_recommendations import generar_recomendacion_ia
 
 
 def _escapar_markdown(texto: str) -> str:
@@ -91,6 +92,8 @@ if prompt:
         for a in actividades:
             lineas.append(f"- {a['tipo']} — {a['detalle']}: **{a['co2']:.2f} kg CO2e**")
         lineas.append(f"\n**Total de este mensaje: {total:.2f} kg CO2e**")
+        recomendacion = generar_recomendacion_ia(actividades, total)
+        lineas.append(f"\n💡 **Recomendación:** {recomendacion}")
         respuesta = "\n".join(lineas)
 
     st.session_state.mensajes.append({

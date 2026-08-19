@@ -17,6 +17,10 @@ de chat (no un formulario).
 - La función de extracción de actividades (`ai_extractor.py`) debe mantener
   siempre el mismo contrato de entrada/salida que tendría una llamada real
   a un LLM, aunque su implementación actual sea simulada (regex/heurística).
+- La función de recomendaciones (`ai_recommendations.py`) SÍ hace una
+  llamada real a la API de Claude cuando hay `ANTHROPIC_API_KEY`. Cualquier
+  fallo (sin key, red, cuota, timeout) debe caer a un respaldo simulado sin
+  romper el chat — nunca dejar que un fallo de servicio externo tumbe la app.
 - Dependencias mínimas: nada de librerías de NLP pesadas para el MVP.
 - Factores de emisión documentados como aproximaciones públicas, no datos
   certificados.
@@ -41,6 +45,6 @@ de chat (no un formulario).
 
 - Autenticación, persistencia externa, integraciones con proveedores reales
   de electricidad/gas.
-- Llamadas reales a una API de IA (queda documentado cómo se conectaría,
-  pero no se activa en este MVP para no depender de API keys en el
-  despliegue de evaluación).
+- Modelos de machine learning entrenados con datos históricos (predicción,
+  detección de anomalías) — la extracción sigue siendo por reglas a
+  propósito; solo las recomendaciones usan un LLM real.

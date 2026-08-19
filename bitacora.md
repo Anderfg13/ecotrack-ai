@@ -52,21 +52,43 @@ Antes / después:
 
 ## 3. Funcionalidad de IA implementada
 
+EcoTrack AI tiene dos capas de IA distintas, con propósitos distintos:
+
+### 3.1 Extracción de actividades (simulada a propósito)
+
 `ai_extractor.extraer_actividades_ia(texto)` recibe el mensaje libre del
 usuario y devuelve una lista estructurada de actividades detectadas (tipo,
 detalle, cantidad, unidad, CO2 estimado), cubriendo cuatro categorías de
 consumo de negocio: flota de vehículos, electricidad (kWh), gas (m³) y
 residuos (kg).
 
-Es una **simulación documentada** de una capa de extracción por IA: en vez
-de una llamada a un modelo de lenguaje, usa palabras clave + expresiones
-regulares. Se decidió así (ver conversación con el usuario) para que el
-MVP funcione sin necesidad de configurar una API key en el entorno de
-despliegue de evaluación. El módulo incluye, en su docstring, el fragmento
-de código que se usaría para reemplazarla por una llamada real a la API de
-Claude sin cambiar el resto de la aplicación — la función ya expone el
-contrato (mismo texto de entrada, misma lista de actividades de salida) que
-tendría esa versión real.
+Es una **simulación documentada**: en vez de una llamada a un modelo de
+lenguaje, usa palabras clave + expresiones regulares. Se decidió así para
+que el MVP funcione sin necesidad de configurar una API key en el entorno
+de despliegue de evaluación. El módulo expone el mismo contrato (texto de
+entrada → lista de actividades de salida) que tendría una versión real
+basada en un LLM, así que sustituirla es un cambio contenido a esta
+función.
+
+### 3.2 Recomendaciones personalizadas (real, con Claude)
+
+`ai_recommendations.generar_recomendacion_ia(actividades, total)` sí hace
+una **llamada real** a la API de Claude (`claude-sonnet-4-5`) cuando hay una
+`ANTHROPIC_API_KEY` configurada: le pasa un resumen de las actividades
+detectadas y el total de CO2, con un system prompt que la instruye a actuar
+como asesor de sostenibilidad y devolver una recomendación breve y
+específica (no genérica).
+
+Si no hay key, o la llamada falla por cualquier motivo (red, cuota,
+timeout), la función cae automáticamente a un recomendador simulado basado
+en reglas (elige un tip según la categoría con mayor CO2 del día). Este
+diseño con respaldo (`try/except` amplio alrededor de la llamada real) es
+intencional: la app nunca debe romperse porque un servicio externo falle.
+
+Captura del chat con la recomendación (modo simulado, sin key configurada
+en este entorno de pruebas):
+
+![recomendación](./screenshots/v3_recomendacion.png)
 
 ## 4. Debugging con IA
 
@@ -102,7 +124,48 @@ literal):
 
 ![bug después](./screenshots/bug_despues_1.png)
 
-## 5. Vibe Coding vs. desarrollo tradicional
+## 5. Prompts por componente
+
+El "Master Prompt" (sección 1) dio el contexto general una sola vez. Cada
+componente se construyó luego con una instrucción puntual sobre esa base:
+
+| Componente | Prompt (resumen fiel de la instrucción dada) |
+|---|---|
+| Frontend / interfaz de chat | "Quiero una interfaz de chat con `st.chat_input`/`st.chat_message`, no un formulario. Debe mostrar la huella acumulada del día arriba, e historial de la conversación." |
+| Backend / parser de actividades | "Detecta vehículos (con cantidad), kWh, m³ de gas y kg de residuos en texto libre en español, con clave-valor de factores de emisión documentados. Si no detecta nada, no falles en silencio: dilo explícitamente." |
+| Iteración de diseño | "Hazlo más minimalista y usa tonos verdes." (instrucción literal del enunciado, aplicada tal cual) |
+| Debugging | "El gas no se está detectando en el segundo mensaje del chat, revisa por qué y corrígelo sin que yo tenga que depurar el regex a mano." |
+| Función de recomendaciones IA | "Agrega una función que llame a la API de Claude para dar una recomendación personalizada según las actividades detectadas, con system prompt de asesor de sostenibilidad, y que si no hay API key o falla la llamada, caiga a un modo simulado sin romper el chat." |
+
+Ninguno de estos prompts se acertó a la primera sin ajuste: por ejemplo, el
+prompt del parser inicial no mencionaba "no falles en silencio" — se agregó
+después de notar que un mensaje sin actividades reconocibles simplemente no
+generaba respuesta, lo cual es una mala experiencia de chat.
+
+## 6. Iteración basada en retroalimentación del evaluador
+
+La primera entrega de este capstone recibió una calificación de 73/100. El
+feedback pedía explícitamente dos cosas que se abordaron en esta segunda
+iteración:
+
+1. *"Documenta explícitamente cómo utilizaste las herramientas de IA...
+   comparte ejemplos de prompts para componentes específicos"* → sección 5
+   de esta bitácora.
+2. *"El proyecto tiene potencial para profundizar en el uso de la IA...
+   recomendaciones contextuales usando LLMs en vez de solo reglas fijas"*
+   → sección 3.2: se agregó `ai_recommendations.py` con una llamada real a
+   Claude (antes todo el pipeline era simulado por decisión explícita de
+   mantener el demo sin dependencias externas; se revirtió parcialmente
+   esa decisión para cumplir con este punto, conservando el respaldo
+   simulado como red de seguridad).
+
+Nota: parte del feedback original mencionaba tecnologías que este proyecto
+nunca usó (Flask, integración directa con OpenAI). Se interpretó como
+retroalimentación parcialmente genérica/plantillada, y se priorizó
+responder a los puntos accionables y verificables sobre el proyecto real
+en lugar de las menciones que no aplicaban.
+
+## 7. Vibe Coding vs. desarrollo tradicional
 
 Construir este MVP tomó una sesión continua de orquestación: describir la
 visión completa una vez (prompt maestro), dejar que el agente generara la
